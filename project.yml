@@ -1,0 +1,44 @@
+name: LiDARScanner
+options:
+  bundleIdPrefix: com.example
+  deploymentTarget:
+    iOS: "17.0"
+  xcodeVersion: "15"
+  createIntermediateGroups: true
+
+packages:
+  ZIPFoundation:
+    url: https://github.com/weichsel/ZIPFoundation.git
+    from: "0.9.19"
+
+targets:
+  LiDARScanner:
+    type: application
+    platform: iOS
+    deploymentTarget: "17.0"
+    sources:
+      - path: LiDARScanner
+    settings:
+      base:
+        PRODUCT_BUNDLE_IDENTIFIER: com.example.LiDARScanner
+        SWIFT_VERSION: "5.9"
+        TARGETED_DEVICE_FAMILY: "1"
+        ENABLE_BITCODE: NO
+        INFOPLIST_FILE: LiDARScanner/Info.plist
+    dependencies:
+      - package: ZIPFoundation
+    info:
+      path: LiDARScanner/Info.plist
+      properties:
+        NSCameraUsageDescription: "Camera access is required to scan rooms using the LiDAR sensor."
+        UIRequiredDeviceCapabilities:
+          - arkit
+          - lidar-depth-camera
+        UILaunchScreen: {}
+        UISupportedInterfaceOrientations:
+          - UIInterfaceOrientationPortrait
+          - UIInterfaceOrientationLandscapeLeft
+          - UIInterfaceOrientationLandscapeRight
+          - UIInterfaceOrientationPortraitUpsideDown
+        UIApplicationSceneManifest:
+          UIApplicationSupportsMultipleScenes: false

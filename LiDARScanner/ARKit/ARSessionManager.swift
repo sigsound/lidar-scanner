@@ -34,6 +34,8 @@ class ARSessionManager: ObservableObject {
 
     private(set) var session: ARSession?
     private(set) var capturedKeyFrames: [CapturedKeyFrame] = []
+    /// Most recent set of ARMeshAnchors seen in any frame — snapshotted while session is live.
+    private(set) var latestMeshAnchors: [ARMeshAnchor] = []
 
     // Strong reference to the delegate adapter — ARSession.delegate is weak,
     // so without this the adapter is immediately deallocated after setSession().
@@ -70,6 +72,7 @@ class ARSessionManager: ObservableObject {
         frameCaptureCounter = 0
         guidance           = .initial
         activeWarning      = nil
+        latestMeshAnchors  = []
     }
 
     /// Attaches an externally-owned ARSession (e.g. from RoomCaptureSession) without
@@ -94,6 +97,12 @@ class ARSessionManager: ObservableObject {
         captureKeyFrameIfNeeded(frame: frame)
         updateMeshCoverage(frame: frame)
         updateGuidance()
+        // Keep a running snapshot of mesh anchors so stopScan() can read them
+        // before the session stops (currentFrame anchors may clear on session end).
+        let anchors = frame.anchors.compactMap { $0 as? ARMeshAnchor }
+        if !anchors.isEmpty {
+            latestMeshAnchors = anchors
+        }
     }
 
     // MARK: - Private helpers

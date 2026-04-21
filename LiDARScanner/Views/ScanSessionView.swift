@@ -217,10 +217,12 @@ struct ScanSessionView: View {
     private func stopScan() {
         guard !isStopping else { return }
         isStopping = true
+        // Snapshot anchors now, while the session is still live.
+        // After stop() the session ends and currentFrame anchors may be cleared.
+        let anchorsSnapshot = sessionManager.latestMeshAnchors
         Task {
             let room = await roomCaptureManager.stop()
-            capturedAnchors   = roomCaptureManager.arSession?.currentFrame?.anchors
-                .compactMap { $0 as? ARMeshAnchor } ?? []
+            capturedAnchors   = anchorsSnapshot
             capturedKeyFrames = sessionManager.capturedKeyFrames
             capturedRoom      = room
             navigateToProcessing = true

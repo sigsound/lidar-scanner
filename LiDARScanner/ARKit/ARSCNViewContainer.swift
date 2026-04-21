@@ -91,19 +91,19 @@ struct ARSCNViewContainer: UIViewRepresentable {
             frameCounter += 1
             guard frameCounter % rebuildStride == 0 else { return }
 
-            guard let scnView  = renderer as? ARSCNView,
-                  let arFrame  = scnView.session.currentFrame else { return }
+            guard let scnView = renderer as? ARSCNView,
+                  let arFrame = scnView.session.currentFrame else { return }
 
-            let anchors = arFrame.anchors.compactMap { $0 as? ARMeshAnchor }
-            guard !anchors.isEmpty else { return }
-
-            pointCloudNode.update(anchors: anchors, frame: arFrame)
-
-            // Forward the frame to ARSessionManager (key-frame capture, coverage, etc.)
-            // Must hop to MainActor since ARSessionManager is @MainActor.
+            // Always forward to ARSessionManager — drives guidance, warnings, and key-frame
+            // capture regardless of whether mesh anchors have appeared yet.
             Task { @MainActor [weak sessionManager] in
                 sessionManager?.didUpdate(frame: arFrame)
             }
+
+            // Point cloud only makes sense once mesh anchors exist.
+            let anchors = arFrame.anchors.compactMap { $0 as? ARMeshAnchor }
+            guard !anchors.isEmpty else { return }
+            pointCloudNode.update(anchors: anchors, frame: arFrame)
         }
     }
 }

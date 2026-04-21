@@ -55,6 +55,14 @@ struct ScanSessionView: View {
             scanStartTime = Date()
             roomCaptureManager.start()
         }
+        .onChange(of: roomCaptureManager.detectedWalls) { _, walls in
+            sessionManager.updateCoverage(walls: walls,
+                                          objects: roomCaptureManager.detectedObjects)
+        }
+        .onChange(of: roomCaptureManager.detectedObjects) { _, objects in
+            sessionManager.updateCoverage(walls: roomCaptureManager.detectedWalls,
+                                          objects: objects)
+        }
         .onDisappear {
             UIApplication.shared.isIdleTimerDisabled = false
         }

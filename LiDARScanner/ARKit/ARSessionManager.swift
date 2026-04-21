@@ -163,7 +163,21 @@ class ARSessionManager: ObservableObject {
 
     private func updateMeshCoverage(frame: ARFrame) {
         let count = frame.anchors.filter { $0 is ARMeshAnchor }.count
-        meshCoverage = min(Float(count) / 30.0, 1.0)
+        // In RoomPlan mode, mesh anchor count may stay low; the caller can
+        // override this via updateCoverage(roomElements:) below.
+        if count > 0 {
+            meshCoverage = min(Float(count) / 30.0, 1.0)
+        }
+    }
+
+    /// Called by ScanSessionView to blend RoomPlan detection counts into coverage
+    /// when raw ARMeshAnchors are sparse (RoomPlan session mode).
+    func updateCoverage(walls: Int, objects: Int) {
+        // Treat 8+ surfaces as "sufficient" coverage (walls + objects combined)
+        let total = walls + objects
+        let roomCoverage = min(Float(total) / 8.0, 1.0)
+        meshCoverage = max(meshCoverage, roomCoverage)
+        updateGuidance()
     }
 
     private func updateGuidance() {

@@ -16,9 +16,21 @@ class MeshProcessor: ObservableObject {
 
         setStatus("Finalizing geometry...", progress: 0.05)
 
-        let aggregatedMesh = try await Task.detached(priority: .userInitiated) {
-            try MeshAggregator.aggregate(meshAnchors: meshAnchors)
-        }.value
+        let aggregatedMesh: AggregatedMesh
+        if !meshAnchors.isEmpty {
+            // Standard path: aggregate raw LiDAR mesh anchors.
+            aggregatedMesh = try await Task.detached(priority: .userInitiated) {
+                try MeshAggregator.aggregate(meshAnchors: meshAnchors)
+            }.value
+        } else if let room = capturedRoom {
+            // RoomPlan path: ARMeshAnchors are not exposed by RoomCaptureSession.
+            // Build geometry from the parametric CapturedRoom surfaces and objects.
+            setStatus("Building room geometry...", progress: 0.05)
+            aggregatedMesh = RoomMeshBuilder.build(from: room)
+            guard !aggregatedMesh.vertices.isEmpty else { throw MeshError.noMeshData }
+        } else {
+            throw MeshError.noMeshData
+        }
 
         setStatus("Baking textures...", progress: 0.35)
 

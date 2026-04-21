@@ -7,6 +7,7 @@
 	objects = {
 
 /* Begin PBXBuildFile section */
+		0CABCA8F38B8410E036C1E3E /* RoomMeshBuilder.swift in Sources */ = {isa = PBXBuildFile; fileRef = FDF621B18F9587F8F2723C07 /* RoomMeshBuilder.swift */; };
 		18495CC9526AF9DE34309DEC /* PointCloudNode.swift in Sources */ = {isa = PBXBuildFile; fileRef = 44E348CD814184CD5DF07DC5 /* PointCloudNode.swift */; };
 		1B93EF19621E818538361624 /* ARSCNViewContainer.swift in Sources */ = {isa = PBXBuildFile; fileRef = 0A3C658CEACA64915361A096 /* ARSCNViewContainer.swift */; };
 		277DFAE6D37BD8351E5CA719 /* MeshProcessor.swift in Sources */ = {isa = PBXBuildFile; fileRef = 6A24F731993DEED37D9070D6 /* MeshProcessor.swift */; };
@@ -55,6 +56,7 @@
 		F0A2756C7473C320B4AFFCED /* Scan.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Scan.swift; sourceTree = "<group>"; };
 		F5370A2B57ACAC79B4C2CE92 /* Assets.xcassets */ = {isa = PBXFileReference; lastKnownFileType = folder.assetcatalog; path = Assets.xcassets; sourceTree = "<group>"; };
 		FBE0805889CFA0A04341E804 /* ScanSessionView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ScanSessionView.swift; sourceTree = "<group>"; };
+		FDF621B18F9587F8F2723C07 /* RoomMeshBuilder.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = RoomMeshBuilder.swift; sourceTree = "<group>"; };
 /* End PBXFileReference section */
 
 /* Begin PBXFrameworksBuildPhase section */
@@ -166,6 +168,7 @@
 				1F85DDAB5B0DA6378FA7536B /* Exporter.swift */,
 				6BDFD1417F5C8B5711C80702 /* MeshAggregator.swift */,
 				6A24F731993DEED37D9070D6 /* MeshProcessor.swift */,
+				FDF621B18F9587F8F2723C07 /* RoomMeshBuilder.swift */,
 				4A9612EE8BF7CA2D652AB75D /* TextureBaker.swift */,
 			);
 			path = Processing;
@@ -255,6 +258,7 @@
 				D176CB5F74170EFBEBC8C79E /* ProcessingView.swift in Sources */,
 				E2F611BE94910253C054B5B9 /* ResultViewerView.swift in Sources */,
 				5436CE1EA1E507FF532D9B9D /* RoomCaptureManager.swift in Sources */,
+				0CABCA8F38B8410E036C1E3E /* RoomMeshBuilder.swift in Sources */,
 				A7F72EFB30462E09B45B5115 /* RoomScanContainer.swift in Sources */,
 				A0F12722E99A92511603FC8A /* Scan.swift in Sources */,
 				2AA4F736A477F243DB2C8982 /* ScanLibraryView.swift in Sources */,

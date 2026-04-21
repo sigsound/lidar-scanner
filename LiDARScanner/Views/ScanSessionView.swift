@@ -23,11 +23,12 @@ struct ScanSessionView: View {
 
     var body: some View {
         ZStack {
-            // Full-screen AR view with point cloud (shares RoomPlan's ARSession)
-            ARSCNViewContainer(
+            // Full-screen scan view: RoomCaptureView (camera + parametric overlay)
+            // with transparent SCNView on top for the colored point cloud.
+            RoomScanContainer(
                 sessionManager: sessionManager,
-                showCamera: $showCamera,
-                externalARSession: roomCaptureManager.arSession
+                roomCaptureManager: roomCaptureManager,
+                showCamera: $showCamera
             )
             .ignoresSafeArea()
 
@@ -53,7 +54,7 @@ struct ScanSessionView: View {
         .onAppear {
             UIApplication.shared.isIdleTimerDisabled = true
             scanStartTime = Date()
-            roomCaptureManager.start()
+            // RoomScanContainer calls roomCaptureManager.start() once its view is ready.
         }
         .onChange(of: roomCaptureManager.detectedWalls) { _, walls in
             sessionManager.updateCoverage(walls: walls,
@@ -217,9 +218,8 @@ struct ScanSessionView: View {
         guard !isStopping else { return }
         isStopping = true
         Task {
-            // Stop RoomPlan and wait for the finalised CapturedRoom
             let room = await roomCaptureManager.stop()
-            capturedAnchors = roomCaptureManager.arSession.currentFrame?.anchors
+            capturedAnchors   = roomCaptureManager.arSession?.currentFrame?.anchors
                 .compactMap { $0 as? ARMeshAnchor } ?? []
             capturedKeyFrames = sessionManager.capturedKeyFrames
             capturedRoom      = room

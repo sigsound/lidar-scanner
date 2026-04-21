@@ -22,6 +22,7 @@
 		A0F12722E99A92511603FC8A /* Scan.swift in Sources */ = {isa = PBXBuildFile; fileRef = F0A2756C7473C320B4AFFCED /* Scan.swift */; };
 		A4BA2A2EEE5FDDF293FA9121 /* LiDARScannerApp.swift in Sources */ = {isa = PBXBuildFile; fileRef = 666A42F89FC5DE0761F730F5 /* LiDARScannerApp.swift */; };
 		A5BAEB8AE76E6C62153ADE27 /* ScanStore.swift in Sources */ = {isa = PBXBuildFile; fileRef = 39765B80731DA35E5038842B /* ScanStore.swift */; };
+		A7F72EFB30462E09B45B5115 /* RoomScanContainer.swift in Sources */ = {isa = PBXBuildFile; fileRef = E6FABB1F2BD6922B533B7B9E /* RoomScanContainer.swift */; };
 		D176CB5F74170EFBEBC8C79E /* ProcessingView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 622C757F5A587C209176C420 /* ProcessingView.swift */; };
 		D7DCE94A94DF0A326797E8D8 /* ScanMetadata.swift in Sources */ = {isa = PBXBuildFile; fileRef = D34F177E40F7A5EA2A757CB7 /* ScanMetadata.swift */; };
 		E2F611BE94910253C054B5B9 /* ResultViewerView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 930F75786366178BB7328F95 /* ResultViewerView.swift */; };
@@ -50,6 +51,7 @@
 		BD88BE26E4CAF5629042A93B /* Info.plist */ = {isa = PBXFileReference; lastKnownFileType = text.plist; path = Info.plist; sourceTree = "<group>"; };
 		BF5D392C4C73F9B882C83E76 /* ScanLibraryView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ScanLibraryView.swift; sourceTree = "<group>"; };
 		D34F177E40F7A5EA2A757CB7 /* ScanMetadata.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ScanMetadata.swift; sourceTree = "<group>"; };
+		E6FABB1F2BD6922B533B7B9E /* RoomScanContainer.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = RoomScanContainer.swift; sourceTree = "<group>"; };
 		F0A2756C7473C320B4AFFCED /* Scan.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Scan.swift; sourceTree = "<group>"; };
 		F5370A2B57ACAC79B4C2CE92 /* Assets.xcassets */ = {isa = PBXFileReference; lastKnownFileType = folder.assetcatalog; path = Assets.xcassets; sourceTree = "<group>"; };
 		FBE0805889CFA0A04341E804 /* ScanSessionView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ScanSessionView.swift; sourceTree = "<group>"; };
@@ -76,6 +78,7 @@
 				5032895BBBA832B1118C990F /* ARViewContainer.swift */,
 				44E348CD814184CD5DF07DC5 /* PointCloudNode.swift */,
 				860394BDC9058F8E338CDAA9 /* RoomCaptureManager.swift */,
+				E6FABB1F2BD6922B533B7B9E /* RoomScanContainer.swift */,
 			);
 			path = ARKit;
 			sourceTree = "<group>";
@@ -252,6 +255,7 @@
 				D176CB5F74170EFBEBC8C79E /* ProcessingView.swift in Sources */,
 				E2F611BE94910253C054B5B9 /* ResultViewerView.swift in Sources */,
 				5436CE1EA1E507FF532D9B9D /* RoomCaptureManager.swift in Sources */,
+				A7F72EFB30462E09B45B5115 /* RoomScanContainer.swift in Sources */,
 				A0F12722E99A92511603FC8A /* Scan.swift in Sources */,
 				2AA4F736A477F243DB2C8982 /* ScanLibraryView.swift in Sources */,
 				D7DCE94A94DF0A326797E8D8 /* ScanMetadata.swift in Sources */,

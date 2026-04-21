@@ -2,8 +2,9 @@ import Foundation
 import RoomPlan
 import ARKit
 
-/// Wraps RoomCaptureSession and publishes incremental room data during scanning.
-/// Exposes the session's underlying ARSession so it can be shared with ARSCNView.
+/// Manages RoomCaptureSession state and publishes detected room elements.
+/// The session itself is owned by RoomCaptureView; call configure(captureSession:)
+/// once the view is ready, then start()/stop() as needed.
 @MainActor
 final class RoomCaptureManager: NSObject, ObservableObject {
 
@@ -11,49 +12,56 @@ final class RoomCaptureManager: NSObject, ObservableObject {
 
     @Published var detectedWalls: Int   = 0
     @Published var detectedObjects: Int = 0
-    @Published var isCapturing: Bool    = false
 
     // MARK: - Internal
 
-    private let captureSession = RoomCaptureSession()
-
-    /// The ARSession owned by RoomPlan — assign this to ARSCNView.session.
-    var arSession: ARSession { captureSession.arSession }
-
+    private(set) var captureSession: RoomCaptureSession?
+    private var latestRoom: CapturedRoom?
     private var stopContinuation: CheckedContinuation<CapturedRoom?, Never>?
 
-    override init() {
-        super.init()
+    /// The ARSession owned by RoomCaptureView — read-only access for mesh anchors.
+    var arSession: ARSession? { captureSession?.arSession }
+
+    // MARK: - Setup
+
+    /// Called from RoomScanContainer once RoomCaptureView exists.
+    func configure(captureSession: RoomCaptureSession) {
+        self.captureSession = captureSession
         captureSession.delegate = self
     }
 
     // MARK: - Control
 
     func start() {
-        let config = RoomCaptureSession.Configuration()
-        isCapturing = true
-        captureSession.run(configuration: config)
+        captureSession?.run(configuration: RoomCaptureSession.Configuration())
     }
 
-    /// Stops the session and returns the final CapturedRoom once RoomPlan finishes processing.
+    /// Stops the session and returns the final CapturedRoom.
+    /// Includes a 5-second timeout so a hung session never blocks the UI.
     func stop() async -> CapturedRoom? {
-        guard isCapturing else { return nil }
+        guard let captureSession else { return latestRoom }
         return await withCheckedContinuation { [weak self] continuation in
             self?.stopContinuation = continuation
-            self?.captureSession.stop()
+            captureSession.stop()
+
+            // Safety net: resume with the last incremental room if didEndWith is late.
+            Task { [weak self] in
+                try? await Task.sleep(nanoseconds: 5_000_000_000)
+                guard let self, let pending = self.stopContinuation else { return }
+                self.stopContinuation = nil
+                pending.resume(returning: self.latestRoom)
+            }
         }
     }
 
-    /// Resets all state and starts a fresh capture — used by the Rescan flow.
+    /// Resets state and restarts a fresh scan — used by the Rescan flow.
     func restart() {
-        // Cancel any pending stop awaiter
         stopContinuation?.resume(returning: nil)
         stopContinuation = nil
-        // Clear counters
         detectedWalls   = 0
         detectedObjects = 0
-        isCapturing     = true
-        captureSession.run(configuration: RoomCaptureSession.Configuration())
+        latestRoom      = nil
+        captureSession?.run(configuration: RoomCaptureSession.Configuration())
     }
 }
 
@@ -68,6 +76,7 @@ extension RoomCaptureManager: RoomCaptureSessionDelegate {
         Task { @MainActor [weak self] in
             self?.detectedWalls   = walls
             self?.detectedObjects = objects
+            self?.latestRoom      = room
         }
     }
 
@@ -79,8 +88,8 @@ extension RoomCaptureManager: RoomCaptureSessionDelegate {
         Task { @MainActor [weak self] in
             self?.detectedWalls   = walls
             self?.detectedObjects = objects
-            self?.isCapturing     = false
-            self?.stopContinuation?.resume(returning: error == nil ? room : nil)
+            self?.latestRoom      = room
+            self?.stopContinuation?.resume(returning: error == nil ? room : self?.latestRoom)
             self?.stopContinuation = nil
         }
     }

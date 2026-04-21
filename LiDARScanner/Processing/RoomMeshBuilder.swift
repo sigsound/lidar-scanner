@@ -19,7 +19,7 @@ enum RoomMeshBuilder {
         var anchorIdx = 0
 
         // All flat surfaces: walls, floors, ceilings, doors, windows, openings
-        let surfaces = room.walls + room.floors + room.ceilings
+        let surfaces = room.walls + room.floors
                      + room.doors + room.windows + room.openings
 
         for surface in surfaces {

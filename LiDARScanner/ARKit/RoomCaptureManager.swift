@@ -25,7 +25,8 @@ final class RoomCaptureManager: NSObject, ObservableObject {
     // MARK: - Setup
 
     /// Called from RoomScanContainer once RoomCaptureView exists.
-    func configure(captureSession: RoomCaptureSession) {
+    func configure(captureSession: RoomCaptureSession?) {
+        guard let captureSession else { return }
         self.captureSession = captureSession
         captureSession.delegate = self
     }

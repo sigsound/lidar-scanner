@@ -1,5 +1,6 @@
 import SwiftUI
 import RoomPlan
+import ARKit
 import SceneKit
 
 /// Wraps a RoomCaptureView (camera feed + parametric room overlay) with a transparent
@@ -32,10 +33,11 @@ struct RoomScanContainer: UIViewRepresentable {
         // Wire managers to RoomCaptureView's session, then start scanning.
         // Must run on MainActor; makeUIView is called on the main thread so this
         // Task executes before the very next run-loop pass.
-        let captureSession = roomView.captureSession
         Task { @MainActor in
-            roomCaptureManager.configure(captureSession: captureSession)
-            sessionManager.attachSession(captureSession.arSession)
+            roomCaptureManager.configure(captureSession: roomView.captureSession)
+            if let arSession = roomCaptureManager.arSession {
+                sessionManager.attachSession(arSession)
+            }
             roomCaptureManager.start()
         }
 

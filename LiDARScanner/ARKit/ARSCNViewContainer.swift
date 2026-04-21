@@ -7,6 +7,9 @@ import SceneKit
 struct ARSCNViewContainer: UIViewRepresentable {
     let sessionManager: ARSessionManager
     @Binding var showCamera: Bool
+    /// When provided (RoomPlan mode), this session is already running — we attach to it
+    /// rather than starting our own. RoomPlan owns the session; we must not call run() on it.
+    var externalARSession: ARSession? = nil
 
     func makeUIView(context: Context) -> ARSCNView {
         let scnView = ARSCNView(frame: .zero)
@@ -18,23 +21,30 @@ struct ARSCNViewContainer: UIViewRepresentable {
         // Add the point cloud node at world origin
         scnView.scene.rootNode.addChildNode(context.coordinator.pointCloudNode)
 
-        // Start AR session
-        let config = ARWorldTrackingConfiguration()
-        config.sceneReconstruction = .meshWithClassification
-        config.environmentTexturing = .automatic
-        if ARWorldTrackingConfiguration.supportsFrameSemantics(.sceneDepth) {
-            config.frameSemantics = [.sceneDepth, .smoothedSceneDepth]
+        if let external = externalARSession {
+            // RoomPlan mode: attach to the already-running session.
+            // Don't call run() — RoomPlan manages the session lifecycle.
+            scnView.session = external
+            Task { @MainActor in
+                sessionManager.attachSession(external)
+            }
+        } else {
+            // Standalone mode: start our own session.
+            let config = ARWorldTrackingConfiguration()
+            config.sceneReconstruction = .meshWithClassification
+            config.environmentTexturing = .automatic
+            if ARWorldTrackingConfiguration.supportsFrameSemantics(.sceneDepth) {
+                config.frameSemantics = [.sceneDepth, .smoothedSceneDepth]
+            }
+            scnView.session.run(config, options: [.resetTracking, .removeExistingAnchors])
+            let session = scnView.session
+            Task { @MainActor in
+                sessionManager.setSession(session)
+            }
         }
-        scnView.session.run(config, options: [.resetTracking, .removeExistingAnchors])
 
         // Register delegate (Coordinator) for render callbacks
         scnView.delegate = context.coordinator
-
-        // Hand session to ARSessionManager
-        let session = scnView.session
-        Task { @MainActor in
-            sessionManager.setSession(session)
-        }
 
         // Apply initial camera background
         applyBackground(to: scnView, showCamera: showCamera)

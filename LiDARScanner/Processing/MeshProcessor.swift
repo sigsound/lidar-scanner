@@ -1,5 +1,6 @@
 import Foundation
 import ARKit
+import RoomPlan
 
 @MainActor
 class MeshProcessor: ObservableObject {
@@ -9,6 +10,7 @@ class MeshProcessor: ObservableObject {
     func process(
         meshAnchors: [ARMeshAnchor],
         keyFrames: [CapturedKeyFrame],
+        capturedRoom: CapturedRoom? = nil,
         duration: TimeInterval
     ) async throws -> Scan {
 
@@ -29,6 +31,7 @@ class MeshProcessor: ObservableObject {
         // Exporter uses UIKit (SCNView snapshot) so it must run on the main actor.
         let scan = try Exporter.export(
             bakedMesh: bakedMesh,
+            capturedRoom: capturedRoom,
             duration: duration
         )
 

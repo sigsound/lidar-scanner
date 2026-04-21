@@ -47,15 +47,11 @@ class ARSessionManager: ObservableObject {
     // Software renderer avoids conflicts with ARKit's Metal pipeline.
     private static let conversionContext = CIContext(options: [.useSoftwareRenderer: true])
 
-    /// Clears all captured data and restarts the AR session for a fresh scan.
+    /// Clears captured data and restarts the AR session.
+    /// Only restarts if this manager owns the session (standalone ARKit mode).
     func reset() {
-        capturedKeyFrames = []
-        capturedFrameCount = 0
-        meshCoverage = 0
-        frameCaptureCounter = 0
-        guidance = .initial
-        activeWarning = nil
-
+        clearCaptureState()
+        guard delegateAdapter != nil else { return }   // externally-owned session — don't restart
         let config = ARWorldTrackingConfiguration()
         config.sceneReconstruction = .meshWithClassification
         config.environmentTexturing = .automatic
@@ -63,6 +59,24 @@ class ARSessionManager: ObservableObject {
             config.frameSemantics = [.sceneDepth, .smoothedSceneDepth]
         }
         session?.run(config, options: [.resetTracking, .removeExistingAnchors])
+    }
+
+    /// Clears all captured data without touching the session — used when the session
+    /// is externally owned (e.g. by RoomCaptureSession).
+    func clearCaptureState() {
+        capturedKeyFrames  = []
+        capturedFrameCount = 0
+        meshCoverage       = 0
+        frameCaptureCounter = 0
+        guidance           = .initial
+        activeWarning      = nil
+    }
+
+    /// Attaches an externally-owned ARSession (e.g. from RoomCaptureSession) without
+    /// overriding its delegate. Key-frame capture is driven by the ARSCNView render loop.
+    func attachSession(_ session: ARSession) {
+        self.session = session
+        // delegateAdapter intentionally left nil — we do not own this session
     }
 
     func setSession(_ session: ARSession) {

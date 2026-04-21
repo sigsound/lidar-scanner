@@ -42,4 +42,13 @@ extension Scan {
     var objZipURL: URL {
         folderURL.appendingPathComponent("mesh_obj.zip")
     }
+
+    /// Parametric RoomPlan model — only present if the scan was captured with RoomPlan.
+    var roomPlanURL: URL {
+        folderURL.appendingPathComponent("room.usdz")
+    }
+
+    var hasRoomPlanModel: Bool {
+        FileManager.default.fileExists(atPath: roomPlanURL.path)
+    }
 }

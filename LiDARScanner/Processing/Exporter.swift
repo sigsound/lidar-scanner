@@ -2,6 +2,7 @@ import Foundation
 import SceneKit
 import ARKit
 import UIKit
+import RoomPlan
 import ZIPFoundation
 
 /// Writes all output files for a completed scan. Must run on the main actor
@@ -11,6 +12,7 @@ enum Exporter {
 
     static func export(
         bakedMesh: BakedMesh,
+        capturedRoom: CapturedRoom? = nil,
         duration: TimeInterval
     ) throws -> Scan {
         let scanID = UUID()
@@ -36,7 +38,13 @@ enum Exporter {
         let thumbURL = folderURL.appendingPathComponent("thumbnail.jpg")
         try generateThumbnail(scene: scene, to: thumbURL)
 
-        // 5. Metadata
+        // 5. RoomPlan parametric model (if available)
+        if let room = capturedRoom {
+            let roomURL = folderURL.appendingPathComponent("room.usdz")
+            try? room.export(to: roomURL, exportOptions: .parametric)
+        }
+
+        // 6. Metadata
         let usdzSize = fileSize(at: usdzURL)
         let zipSize  = fileSize(at: zipURL)
         let metadata = ScanMetadata(date: Date(), duration: duration,

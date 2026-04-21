@@ -27,6 +27,7 @@ targets:
         INFOPLIST_FILE: LiDARScanner/Info.plist
     dependencies:
       - package: ZIPFoundation
+      - sdk: RoomPlan.framework
     info:
       path: LiDARScanner/Info.plist
       properties:

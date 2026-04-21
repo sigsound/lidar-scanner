@@ -1,17 +1,21 @@
 import SwiftUI
 import ARKit
+import RoomPlan
 
 struct ScanSessionView: View {
     @EnvironmentObject var scanStore: ScanStore
     @Environment(\.dismiss) private var dismiss
 
     @StateObject private var sessionManager = ARSessionManager()
+    @StateObject private var roomCaptureManager = RoomCaptureManager()
     @State private var showingCancelAlert = false
     @State private var navigateToProcessing = false
     @State private var capturedAnchors: [ARMeshAnchor] = []
     @State private var capturedKeyFrames: [CapturedKeyFrame] = []
+    @State private var capturedRoom: CapturedRoom?
     @State private var scanStartTime = Date()
     @State private var showCamera = true
+    @State private var isStopping = false
 
     // Thermal monitoring
     @State private var thermalWarning = false
@@ -19,9 +23,13 @@ struct ScanSessionView: View {
 
     var body: some View {
         ZStack {
-            // Full-screen AR view with point cloud
-            ARSCNViewContainer(sessionManager: sessionManager, showCamera: $showCamera)
-                .ignoresSafeArea()
+            // Full-screen AR view with point cloud (shares RoomPlan's ARSession)
+            ARSCNViewContainer(
+                sessionManager: sessionManager,
+                showCamera: $showCamera,
+                externalARSession: roomCaptureManager.arSession
+            )
+            .ignoresSafeArea()
 
             VStack(spacing: 0) {
                 topBar
@@ -45,6 +53,7 @@ struct ScanSessionView: View {
         .onAppear {
             UIApplication.shared.isIdleTimerDisabled = true
             scanStartTime = Date()
+            roomCaptureManager.start()
         }
         .onDisappear {
             UIApplication.shared.isIdleTimerDisabled = false
@@ -63,13 +72,16 @@ struct ScanSessionView: View {
             ProcessingView(
                 meshAnchors: capturedAnchors,
                 keyFrames: capturedKeyFrames,
+                capturedRoom: capturedRoom,
                 duration: Date().timeIntervalSince(scanStartTime),
                 onRescan: {
                     navigateToProcessing = false
-                    capturedAnchors = []
+                    capturedAnchors   = []
                     capturedKeyFrames = []
-                    scanStartTime = Date()
-                    sessionManager.reset()
+                    capturedRoom      = nil
+                    scanStartTime     = Date()
+                    sessionManager.clearCaptureState()
+                    roomCaptureManager.restart()
                 }
             )
         }
@@ -119,13 +131,19 @@ struct ScanSessionView: View {
                 .padding(.horizontal)
 
             Button(action: stopScan) {
-                Label("Stop & Process", systemImage: "stop.circle.fill")
-                    .frame(maxWidth: .infinity)
+                if isStopping {
+                    Label("Finalising...", systemImage: "hourglass")
+                        .frame(maxWidth: .infinity)
+                } else {
+                    Label("Stop & Process", systemImage: "stop.circle.fill")
+                        .frame(maxWidth: .infinity)
+                }
             }
             .buttonStyle(.borderedProminent)
             .tint(.red)
             .controlSize(.large)
             .padding(.horizontal)
+            .disabled(isStopping)
         }
         .padding(.vertical, 16)
         .background(.ultraThinMaterial)
@@ -134,10 +152,21 @@ struct ScanSessionView: View {
     private var coverageBar: some View {
         VStack(spacing: 6) {
             HStack {
-                Text("Mesh Coverage")
+                Text("Coverage")
                     .font(.caption)
                     .foregroundStyle(.secondary)
                 Spacer()
+                if roomCaptureManager.detectedWalls > 0 || roomCaptureManager.detectedObjects > 0 {
+                    Image(systemName: "square.3.layers.3d")
+                        .font(.caption)
+                        .foregroundStyle(.cyan)
+                    Text("\(roomCaptureManager.detectedWalls)W \(roomCaptureManager.detectedObjects)Obj")
+                        .font(.caption.monospacedDigit())
+                        .foregroundStyle(.cyan)
+                    Text("·")
+                        .font(.caption)
+                        .foregroundStyle(.secondary)
+                }
                 Text("\(sessionManager.capturedFrameCount) frames")
                     .font(.caption.monospacedDigit())
                     .foregroundStyle(sessionManager.capturedFrameCount > 0 ? .green : .secondary)
@@ -177,9 +206,17 @@ struct ScanSessionView: View {
     // MARK: - Actions
 
     private func stopScan() {
-        capturedAnchors = sessionManager.session?.currentFrame?.anchors
-            .compactMap { $0 as? ARMeshAnchor } ?? []
-        capturedKeyFrames = sessionManager.capturedKeyFrames
-        navigateToProcessing = true
+        guard !isStopping else { return }
+        isStopping = true
+        Task {
+            // Stop RoomPlan and wait for the finalised CapturedRoom
+            let room = await roomCaptureManager.stop()
+            capturedAnchors = roomCaptureManager.arSession.currentFrame?.anchors
+                .compactMap { $0 as? ARMeshAnchor } ?? []
+            capturedKeyFrames = sessionManager.capturedKeyFrames
+            capturedRoom      = room
+            navigateToProcessing = true
+            isStopping = false
+        }
     }
 }

@@ -10,35 +10,27 @@ struct ARSCNViewContainer: UIViewRepresentable {
 
     func makeUIView(context: Context) -> ARSCNView {
         let scnView = ARSCNView(frame: .zero)
-        scnView.automaticallyUpdatesLighting = true
+        scnView.automaticallyUpdatesLighting = false  // we handle this ourselves
         scnView.autoenablesDefaultLighting    = false
         scnView.showsStatistics               = false
-        scnView.antialiasingMode              = .none   // save GPU during scan
+        scnView.antialiasingMode              = .none
 
-        // Add the point cloud node at world origin
         scnView.scene.rootNode.addChildNode(context.coordinator.pointCloudNode)
 
-        // Start AR session
         let config = ARWorldTrackingConfiguration()
         config.sceneReconstruction = .meshWithClassification
-        config.environmentTexturing = .automatic
-        if ARWorldTrackingConfiguration.supportsFrameSemantics(.sceneDepth) {
-            config.frameSemantics = [.sceneDepth, .smoothedSceneDepth]
-        }
+        // environmentTexturing and sceneDepth are NOT used in this app.
+        // Leaving them off cuts initial GPU/CPU load significantly.
         scnView.session.run(config, options: [.resetTracking, .removeExistingAnchors])
 
-        // Register delegate (Coordinator) for render callbacks
         scnView.delegate = context.coordinator
 
-        // Hand session to ARSessionManager
         let session = scnView.session
         Task { @MainActor in
             sessionManager.setSession(session)
         }
 
-        // Apply initial camera background
         applyBackground(to: scnView, showCamera: showCamera)
-
         return scnView
     }
 
@@ -50,47 +42,38 @@ struct ARSCNViewContainer: UIViewRepresentable {
         Coordinator(sessionManager: sessionManager)
     }
 
-    // MARK: - Background helpers
-
     private func applyBackground(to scnView: ARSCNView, showCamera: Bool) {
-        if showCamera {
-            // nil → ARSCNView renders the live camera feed as background
-            scnView.scene.background.contents = nil
-        } else {
-            scnView.scene.background.contents = UIColor(white: 0.05, alpha: 1)
-        }
+        scnView.scene.background.contents = showCamera ? nil : UIColor(white: 0.05, alpha: 1)
     }
 
     // MARK: - Coordinator
 
     final class Coordinator: NSObject, ARSCNViewDelegate {
         let pointCloudNode = PointCloudNode()
-        private let sessionManager: ARSessionManager
+        private weak var sessionManager: ARSessionManager?
 
-        // Throttle point cloud rebuilds so they don't saturate the render thread.
-        // Rebuild at most every N rendered frames (~15 fps at 60 fps display).
-        private let rebuildStride = 4
-        private var frameCounter = 0
+        // Point cloud runs every frame (cheap when nothing changed).
+        // Session manager (key frames, guidance) runs less often.
+        private var frameCounter  = 0
+        private let sessionStride = 8   // ~4 Hz at 30 Hz display
 
         init(sessionManager: ARSessionManager) {
             self.sessionManager = sessionManager
         }
 
-        // Called on the render thread once per display refresh.
         func renderer(_ renderer: SCNSceneRenderer, updateAtTime time: TimeInterval) {
-            frameCounter += 1
-            guard frameCounter % rebuildStride == 0 else { return }
+            guard let scnView = renderer as? ARSCNView,
+                  let arFrame = scnView.session.currentFrame else { return }
 
-            guard let scnView  = renderer as? ARSCNView,
-                  let arFrame  = scnView.session.currentFrame else { return }
-
+            // Point cloud: every frame so fade-in animation stays smooth.
             let anchors = arFrame.anchors.compactMap { $0 as? ARMeshAnchor }
-            guard !anchors.isEmpty else { return }
+            if !anchors.isEmpty {
+                pointCloudNode.update(anchors: anchors, frame: arFrame, time: time)
+            }
 
-            pointCloudNode.update(anchors: anchors, frame: arFrame)
-
-            // Forward the frame to ARSessionManager (key-frame capture, coverage, etc.)
-            // Must hop to MainActor since ARSessionManager is @MainActor.
+            // Session state (key frames, coverage, guidance): lower frequency.
+            frameCounter += 1
+            guard frameCounter % sessionStride == 0 else { return }
             Task { @MainActor [weak sessionManager] in
                 sessionManager?.didUpdate(frame: arFrame)
             }

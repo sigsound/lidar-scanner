@@ -2,92 +2,97 @@ import SceneKit
 import ARKit
 import simd
 
-/// Dense, continuously-accumulating point cloud driven by raw LiDAR depth data.
+/// Dense, continuously-accumulating LiDAR point cloud.
 ///
-/// Each frame, ARFrame.smoothedSceneDepth (or sceneDepth) is unprojected
-/// pixel-by-pixel into world-space 3D points. A voxel hash map eliminates
-/// duplicates — each 3cm cell stores the best (most recently captured)
-/// photographic color. The result mirrors the style of LiDAR-Visual SLAM
-/// systems: organic, continuous surface coverage with no triangulation
-/// artifacts, growing denser the longer you dwell on an area.
+/// Each frame, ARFrame.smoothedSceneDepth is unprojected pixel-by-pixel into
+/// world-space points and deduplicated via a 3cm voxel hash. Points are
+/// accumulated into fixed-size chunks; completed chunks are frozen into
+/// permanent SCNNodes (never rebuilt). Only the current live chunk (≤10k pts)
+/// is rebuilt, keeping the per-frame geometry cost constant regardless of
+/// total cloud size.
 final class PointCloudNode: SCNNode {
 
     // MARK: - Configuration
-    private let voxelSize: Float  = 0.03     // 3 cm grid → dense but fast
-    private let maxVoxels         = 200_000  // GPU cap (~200k is fine on A15+)
-    private let depthSampleStride = 4        // sample every 4th depth pixel
-    private let rebuildInterval   = 0.12     // max ~8 geometry rebuilds / sec
-    private let minDepth: Float   = 0.20     // metres — ignore very close hits
-    private let maxDepth: Float   = 4.50     // metres — LiDAR reliable range
+    private let voxelSize: Float  = 0.030    // 3 cm cells
+    private let maxVoxels         = 500_000  // stop accepting new points after this
+    private let depthStride       = 6        // sample every 6th depth pixel
+    private let chunkCap          = 10_000   // freeze a chunk when it reaches this size
+    private let liveRebuildHz     = 0.10     // seconds between live-chunk geometry rebuilds
+    private let minDepth: Float   = 0.20     // metres
+    private let maxDepth: Float   = 4.50
 
-    // MARK: - Voxel accumulation
-    // Key: three 20-bit voxel indices packed into Int64.
-    // Value: (world position, RGBA color)
-    private var voxelData: [Int64: (SIMD3<Float>, SIMD4<Float>)] = [:]
-
-    // Flat arrays built incrementally — appended as voxels are created.
-    private var stablePositions: [SIMD3<Float>] = []
-    private var stableColors:    [SIMD4<Float>]  = []
-    // New voxels since the last geometry commit.
-    private var pendingPositions: [SIMD3<Float>] = []
-    private var pendingColors:    [SIMD4<Float>]  = []
-
-    private var lastRebuildTime = TimeInterval(0)
-    private let cloudNode = SCNNode()
+    // MARK: - Accumulation
+    /// Which voxels are already occupied — O(1) insert/lookup, 8 bytes per entry.
+    private var occupied  = Set<Int64>()
+    /// Permanently frozen geometry nodes — never touched after creation.
+    private var frozenNodes: [SCNNode] = []
+    /// Current partial chunk, rebuilt at liveRebuildHz.
+    private let liveNode = SCNNode()
+    private var livePositions: [SIMD3<Float>] = []
+    private var liveColors:    [SIMD4<Float>]  = []
+    private var lastLiveTime  = TimeInterval(0)
 
     // MARK: - Init
-
     override init() {
         super.init()
-        addChildNode(cloudNode)
+        occupied.reserveCapacity(maxVoxels)
+        livePositions.reserveCapacity(chunkCap)
+        liveColors.reserveCapacity(chunkCap)
+        addChildNode(liveNode)
     }
     required init?(coder: NSCoder) { fatalError() }
 
     // MARK: - Public update (render thread, every frame)
 
     func update(frame: ARFrame, time: TimeInterval) {
-        guard voxelData.count < maxVoxels else { return }
+        // Ingest depth only while under the cap.
+        if occupied.count < maxVoxels {
+            let depthData = frame.smoothedSceneDepth ?? frame.sceneDepth
+            if let dm = depthData?.depthMap {
+                ingestDepth(depthMap: dm,
+                            confidenceMap: depthData?.confidenceMap,
+                            frame: frame)
+            }
+        }
 
-        let depthData = frame.smoothedSceneDepth ?? frame.sceneDepth
-        guard let depthMap = depthData?.depthMap else { return }
+        // Freeze full chunks immediately (only touches the now-empty live arrays).
+        if livePositions.count >= chunkCap {
+            freezeChunk()
+        }
 
-        processDepthMap(depthMap: depthMap,
-                        confidenceMap: depthData?.confidenceMap,
-                        frame: frame)
-
-        // Commit new points to geometry at the target rebuild rate.
-        if !pendingPositions.isEmpty,
-           (time - lastRebuildTime) >= rebuildInterval {
-            commit(at: time)
+        // Rebuild live geometry at the requested rate.
+        if !livePositions.isEmpty, (time - lastLiveTime) >= liveRebuildHz {
+            rebuildLive()
+            lastLiveTime = time
         }
     }
 
-    // MARK: - Depth processing
+    // MARK: - Depth ingestion
 
-    private func processDepthMap(
-        depthMap: CVPixelBuffer,
+    private func ingestDepth(
+        depthMap:      CVPixelBuffer,
         confidenceMap: CVPixelBuffer?,
-        frame: ARFrame
+        frame:         ARFrame
     ) {
         CVPixelBufferLockBaseAddress(depthMap, .readOnly)
         defer { CVPixelBufferUnlockBaseAddress(depthMap, .readOnly) }
 
         var confBase: UnsafeMutableRawPointer?
-        var confRowBytes = 0
+        var confRow  = 0
         if let cm = confidenceMap {
             CVPixelBufferLockBaseAddress(cm, .readOnly)
-            confBase     = CVPixelBufferGetBaseAddress(cm)
-            confRowBytes = CVPixelBufferGetBytesPerRow(cm)
+            confBase = CVPixelBufferGetBaseAddress(cm)
+            confRow  = CVPixelBufferGetBytesPerRow(cm)
         }
         defer { confidenceMap.map { CVPixelBufferUnlockBaseAddress($0, .readOnly) } }
 
-        let dW    = CVPixelBufferGetWidth(depthMap)
-        let dH    = CVPixelBufferGetHeight(depthMap)
-        let dRow  = CVPixelBufferGetBytesPerRow(depthMap)
+        let dW   = CVPixelBufferGetWidth(depthMap)
+        let dH   = CVPixelBufferGetHeight(depthMap)
+        let dRow = CVPixelBufferGetBytesPerRow(depthMap)
         guard let dBase = CVPixelBufferGetBaseAddress(depthMap) else { return }
 
-        // Camera image for photographic colour.
-        let rgb = frame.capturedImage
+        // RGB colour planes for photographic colouring.
+        let rgb   = frame.capturedImage
         CVPixelBufferLockBaseAddress(rgb, .readOnly)
         defer { CVPixelBufferUnlockBaseAddress(rgb, .readOnly) }
         let rW = CVPixelBufferGetWidth(rgb)
@@ -97,92 +102,93 @@ final class PointCloudNode: SCNNode {
         let yRowB    = CVPixelBufferGetBytesPerRowOfPlane(rgb, 0)
         let cbCrRowB = CVPixelBufferGetBytesPerRowOfPlane(rgb, 1)
 
-        // Depth-camera intrinsics (colour intrinsics scaled to depth resolution).
+        // Intrinsics: depth-map space (scaled from colour-camera intrinsics).
         let m   = frame.camera.intrinsics
         let sx  = Float(dW) / Float(frame.camera.imageResolution.width)
         let sy  = Float(dH) / Float(frame.camera.imageResolution.height)
-        let dfx = m[0][0] * sx;  let dfy = m[1][1] * sy
-        let dcx = m[2][0] * sx;  let dcy = m[2][1] * sy
-        // Colour-camera intrinsics (full resolution).
-        let cfx = m[0][0]; let cfy = m[1][1]
-        let ccx = m[2][0]; let ccy = m[2][1]
+        let dfx = m[0][0]*sx;  let dfy = m[1][1]*sy
+        let dcx = m[2][0]*sx;  let dcy = m[2][1]*sy
+        let cfx = m[0][0];     let cfy = m[1][1]
+        let ccx = m[2][0];     let ccy = m[2][1]
 
         let camTf      = frame.camera.transform
         let worldToCam = camTf.inverse
 
-        outer: for dv in Swift.stride(from: 0, to: dH, by: depthSampleStride) {
-            for du in Swift.stride(from: 0, to: dW, by: depthSampleStride) {
+        outer: for dv in Swift.stride(from: 0, to: dH, by: depthStride) {
+            for du in Swift.stride(from: 0, to: dW, by: depthStride) {
 
-                // Reject low-confidence pixels (ARConfidenceLevel: 0=low 1=med 2=high).
-                if let cb = confBase {
-                    guard cb.advanced(by: dv * confRowBytes + du)
-                              .load(as: UInt8.self) >= 1
-                    else { continue }
-                }
+                // Skip low-confidence pixels (0=low, 1=medium, 2=high).
+                if let cb = confBase,
+                   cb.advanced(by: dv*confRow + du).load(as: UInt8.self) < 1 { continue }
 
-                // Read depth (Float32, metres, positive = distance from camera).
-                let depth = dBase.advanced(by: dv * dRow + du * 4)
-                    .load(as: Float32.self)
+                let depth = dBase.advanced(by: dv*dRow + du*4).load(as: Float32.self)
                 guard depth >= minDepth, depth <= maxDepth else { continue }
 
-                // Unproject depth pixel → camera space → world space.
-                // ARKit camera: looks down −Z, +Y up, +X right.
+                // Unproject: depth pixel → camera space → world space.
                 let xCam =  (Float(du) - dcx) / dfx * depth
-                let yCam = -(Float(dv) - dcy) / dfy * depth   // flip image-Y → cam-Y
-                let zCam = -depth                               // depth is +, camera Z is −
+                let yCam = -(Float(dv) - dcy) / dfy * depth  // flip image-Y → cam-Y
+                let zCam = -depth                              // camera looks down −Z
                 let w4   = camTf * SIMD4<Float>(xCam, yCam, zCam, 1)
                 let wp   = SIMD3<Float>(w4.x, w4.y, w4.z)
 
-                // Skip if this voxel is already filled.
+                // Skip already-occupied voxels.
                 let key = voxelKey(wp)
-                guard voxelData[key] == nil else { continue }
+                guard occupied.insert(key).inserted else { continue }
 
-                // Sample photographic colour at the corresponding camera pixel.
-                let p4 = worldToCam * SIMD4<Float>(wp.x, wp.y, wp.z, 1)
+                // Sample photographic colour at the corresponding RGB pixel.
+                let p4  = worldToCam * SIMD4<Float>(wp.x, wp.y, wp.z, 1)
                 guard p4.z < 0 else { continue }
                 let rpx = Int(cfx * (p4.x / (-p4.z)) + ccx)
                 let rpy = Int(-cfy * (p4.y / (-p4.z)) + ccy)
 
                 var col = SIMD4<Float>(0.28, 0.28, 0.28, 1)
                 if rpx >= 0, rpx < rW, rpy >= 0, rpy < rH {
-                    let yVal = Float(yBase.advanced(by: rpy * yRowB + rpx)
+                    let yVal = Float(yBase.advanced(by: rpy*yRowB + rpx)
                         .load(as: UInt8.self)) / 255.0
-                    let cbCrX = rpx / 2;  let cbCrY = rpy / 2
-                    let cbOff = cbCrY * cbCrRowB + cbCrX * 2
-                    let cb  = Float(cbCrBase.advanced(by: cbOff)    .load(as: UInt8.self)) / 255.0 - 0.5
-                    let cr  = Float(cbCrBase.advanced(by: cbOff + 1).load(as: UInt8.self)) / 255.0 - 0.5
-                    let r   = min(max(yVal + 1.402  * cr,            0), 1)
-                    let g   = min(max(yVal - 0.3441 * cb - 0.7141 * cr, 0), 1)
-                    let b   = min(max(yVal + 1.772  * cb,            0), 1)
+                    let cx2 = rpx/2, cy2 = rpy/2
+                    let cb2Off = cy2*cbCrRowB + cx2*2
+                    let cb2 = Float(cbCrBase.advanced(by: cb2Off)  .load(as: UInt8.self)) / 255.0 - 0.5
+                    let cr  = Float(cbCrBase.advanced(by: cb2Off+1).load(as: UInt8.self)) / 255.0 - 0.5
+                    let r   = min(max(yVal + 1.402*cr,             0), 1)
+                    let g   = min(max(yVal - 0.3441*cb2 - 0.7141*cr, 0), 1)
+                    let b   = min(max(yVal + 1.772*cb2,            0), 1)
                     col = SIMD4<Float>(r, g, b, 1)
                 }
 
-                voxelData[key] = (wp, col)
-                pendingPositions.append(wp)
-                pendingColors.append(col)
+                livePositions.append(wp)
+                liveColors.append(col)
 
-                if voxelData.count >= maxVoxels { break outer }
+                if occupied.count >= maxVoxels { break outer }
             }
         }
     }
 
-    // MARK: - Geometry commit
+    // MARK: - Chunk management
 
-    /// Appends pending voxels to the stable arrays and rebuilds SCNGeometry.
-    private func commit(at time: TimeInterval) {
-        stablePositions += pendingPositions
-        stableColors    += pendingColors
-        pendingPositions.removeAll(keepingCapacity: true)
-        pendingColors.removeAll(keepingCapacity: true)
-        lastRebuildTime = time
-
-        applyGeometry(positions: stablePositions, colors: stableColors)
+    /// Freezes the live chunk into a permanent SCNNode and resets the live buffer.
+    private func freezeChunk() {
+        guard !livePositions.isEmpty else { return }
+        let node = SCNNode()
+        node.geometry = buildGeometry(positions: livePositions, colors: liveColors)
+        frozenNodes.append(node)
+        addChildNode(node)
+        livePositions.removeAll(keepingCapacity: true)
+        liveColors.removeAll(keepingCapacity: true)
+        liveNode.geometry = nil
     }
 
-    // MARK: - SCNGeometry
+    /// Rebuilds the live-chunk geometry with whatever points are currently pending.
+    private func rebuildLive() {
+        liveNode.geometry = buildGeometry(positions: livePositions, colors: liveColors)
+    }
 
-    private func applyGeometry(positions: [SIMD3<Float>], colors: [SIMD4<Float>]) {
-        guard !positions.isEmpty else { return }
+    // MARK: - SCNGeometry builder
+
+    private func buildGeometry(
+        positions: [SIMD3<Float>],
+        colors:    [SIMD4<Float>]
+    ) -> SCNGeometry? {
+        guard !positions.isEmpty else { return nil }
 
         let posData = Data(bytes: positions,
                           count: positions.count * MemoryLayout<SIMD3<Float>>.stride)
@@ -217,13 +223,13 @@ final class PointCloudNode: SCNNode {
         mat.diffuse.contents = UIColor.white
         mat.isDoubleSided    = true
         geo.materials = [mat]
-        cloudNode.geometry = geo
+        return geo
     }
 
     // MARK: - Voxel key
 
-    /// Packs three 20-bit signed voxel indices into a single Int64.
-    /// Range per axis: ±524,287 voxels × 3 cm = ±157 m — far beyond any room.
+    /// Packs three 20-bit signed voxel indices into an Int64.
+    /// ±524,287 voxels × 3 cm = ±157 m per axis — well beyond indoor range.
     private func voxelKey(_ p: SIMD3<Float>) -> Int64 {
         let ix = Int64(Int32((p.x / voxelSize).rounded(.down)))
         let iy = Int64(Int32((p.y / voxelSize).rounded(.down)))

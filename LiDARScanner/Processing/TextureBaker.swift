@@ -64,10 +64,13 @@ enum TextureBaker {
             let v2 = mesh.vertices[Int(face[2])];  let n2 = mesh.normals[Int(face[2])]
 
             let centroid = (v0 + v1 + v2) / 3
+            // Average vertex normal — used to reject frames where the face is back-facing.
+            let faceNormal = simd_normalize((n0 + n1 + n2) / 3)
 
             // Find the best key frame where all three vertices are in-frame.
             let frameIdx = bestFrameIndex(
                 for: centroid,
+                faceNormal: faceNormal,
                 v0: v0, v1: v1, v2: v2,
                 in: keyFrames
             )
@@ -102,22 +105,32 @@ enum TextureBaker {
 
     // MARK: - Core helpers
 
-    /// Selects the index of the best key frame for a triangle, requiring that
-    /// all three projected vertices fall within the image bounds (+ a 5% margin).
-    /// Falls back to the best available frame if none fully contains the face.
+    /// Selects the index of the best key frame for a triangle, requiring that:
+    ///   1. The face normal faces toward the camera (prevents back-projection ghosting).
+    ///   2. All three projected vertices fall within the image bounds (+ 8% margin).
+    /// Falls back to the best-scoring frame if none fully satisfies both criteria.
     private static func bestFrameIndex(
         for centroid: SIMD3<Float>,
+        faceNormal: SIMD3<Float>,
         v0: SIMD3<Float>,
         v1: SIMD3<Float>,
         v2: SIMD3<Float>,
         in keyFrames: [CapturedKeyFrame]
     ) -> Int {
-        var bestFull   = Float(-1);  var bestFullIdx   = -1   // all 3 verts in frame
-        var bestPartial = Float(-1); var bestPartialIdx = 0   // fallback
+        var bestFull    = Float(-1); var bestFullIdx   = -1
+        var bestPartial = Float(-1); var bestPartialIdx = 0
 
         for (idx, frame) in keyFrames.enumerated() {
             let score = alignmentScore(for: centroid, frame: frame)
             guard score > 0.05 else { continue }
+
+            // Reject frames where the face is back-facing or nearly edge-on.
+            // dot(faceNormal, camToFace) < 0 means the face points toward the camera.
+            let camPos = SIMD3<Float>(frame.cameraTransform.columns.3.x,
+                                     frame.cameraTransform.columns.3.y,
+                                     frame.cameraTransform.columns.3.z)
+            let camToFace = simd_normalize(centroid - camPos)
+            guard simd_dot(faceNormal, camToFace) < 0.2 else { continue }
 
             if score > bestPartial {
                 bestPartial    = score
@@ -165,7 +178,7 @@ enum TextureBaker {
         let alignment = simd_dot(simd_normalize(camForward), simd_normalize(toPoint))
         guard alignment > 0.05 else { return 0 }
 
-        return alignment / (1 + distance * 0.12)
+        return alignment / (1 + distance * 0.25)   // stronger distance penalty vs old 0.12
     }
 
     /// Projects a world-space point and converts to atlas UV within a tile.
@@ -206,7 +219,7 @@ enum TextureBaker {
     /// Returns true if the projected point falls within the image bounds,
     /// with a small inset margin so edge-grazing vertices are excluded.
     private static func inBounds(_ p: CGPoint, w: Double, h: Double) -> Bool {
-        let margin = 0.04  // 4% inset
+        let margin = 0.08  // 8% inset — wider margin avoids distorted edge projections
         return p.x >= w * margin  && p.x <= w * (1 - margin)
             && p.y >= h * margin  && p.y <= h * (1 - margin)
     }

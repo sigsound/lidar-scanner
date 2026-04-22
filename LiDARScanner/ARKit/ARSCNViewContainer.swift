@@ -3,14 +3,13 @@ import ARKit
 import SceneKit
 
 /// UIViewRepresentable wrapping ARSCNView for real-time point cloud rendering.
-/// The camera feed can be toggled on/off; the point cloud always renders.
 struct ARSCNViewContainer: UIViewRepresentable {
     let sessionManager: ARSessionManager
     @Binding var showCamera: Bool
 
     func makeUIView(context: Context) -> ARSCNView {
         let scnView = ARSCNView(frame: .zero)
-        scnView.automaticallyUpdatesLighting = false  // we handle this ourselves
+        scnView.automaticallyUpdatesLighting = false
         scnView.autoenablesDefaultLighting    = false
         scnView.showsStatistics               = false
         scnView.antialiasingMode              = .none
@@ -19,8 +18,13 @@ struct ARSCNViewContainer: UIViewRepresentable {
 
         let config = ARWorldTrackingConfiguration()
         config.sceneReconstruction = .meshWithClassification
-        // environmentTexturing and sceneDepth are NOT used in this app.
-        // Leaving them off cuts initial GPU/CPU load significantly.
+        // sceneDepth drives the live point cloud visualisation.
+        // smoothedSceneDepth applies temporal filtering for cleaner colours.
+        if ARWorldTrackingConfiguration.supportsFrameSemantics(.smoothedSceneDepth) {
+            config.frameSemantics = .smoothedSceneDepth
+        } else if ARWorldTrackingConfiguration.supportsFrameSemantics(.sceneDepth) {
+            config.frameSemantics = .sceneDepth
+        }
         scnView.session.run(config, options: [.resetTracking, .removeExistingAnchors])
 
         scnView.delegate = context.coordinator
@@ -51,11 +55,8 @@ struct ARSCNViewContainer: UIViewRepresentable {
     final class Coordinator: NSObject, ARSCNViewDelegate {
         let pointCloudNode = PointCloudNode()
         private weak var sessionManager: ARSessionManager?
-
-        // Point cloud runs every frame (cheap when nothing changed).
-        // Session manager (key frames, guidance) runs less often.
-        private var frameCounter  = 0
-        private let sessionStride = 8   // ~4 Hz at 30 Hz display
+        private var frameCounter = 0
+        private let sessionStride = 8   // session manager at ~4 Hz
 
         init(sessionManager: ARSessionManager) {
             self.sessionManager = sessionManager
@@ -65,13 +66,10 @@ struct ARSCNViewContainer: UIViewRepresentable {
             guard let scnView = renderer as? ARSCNView,
                   let arFrame = scnView.session.currentFrame else { return }
 
-            // Point cloud: every frame so fade-in animation stays smooth.
-            let anchors = arFrame.anchors.compactMap { $0 as? ARMeshAnchor }
-            if !anchors.isEmpty {
-                pointCloudNode.update(anchors: anchors, frame: arFrame, time: time)
-            }
+            // Point cloud: every frame — cheap when voxels are already filled.
+            pointCloudNode.update(frame: arFrame, time: time)
 
-            // Session state (key frames, coverage, guidance): lower frequency.
+            // Session state (key frames, guidance, mesh anchors for export): lower rate.
             frameCounter += 1
             guard frameCounter % sessionStride == 0 else { return }
             Task { @MainActor [weak sessionManager] in

@@ -117,11 +117,13 @@ enum TextureBaker {
         v2: SIMD3<Float>,
         in keyFrames: [CapturedKeyFrame]
     ) -> Int {
-        var bestFull    = Float(-1); var bestFullIdx   = -1
-        var bestPartial = Float(-1); var bestPartialIdx = 0
+        var bestFull    = Float(-1); var bestFullIdx    = -1
+        var bestPartial = Float(-1); var bestPartialIdx = -1
+        var bestAny     = Float(-1); var bestAnyIdx     = 0
 
         for (idx, frame) in keyFrames.enumerated() {
             let score = alignmentScore(for: centroid, frame: frame)
+            if score > bestAny { bestAny = score; bestAnyIdx = idx }
             guard score > 0.05 else { continue }
 
             // Reject frames where the face is back-facing or nearly edge-on.
@@ -152,7 +154,9 @@ enum TextureBaker {
             }
         }
 
-        return bestFullIdx >= 0 ? bestFullIdx : bestPartialIdx
+        if bestFullIdx    >= 0 { return bestFullIdx }
+        if bestPartialIdx >= 0 { return bestPartialIdx }
+        return bestAnyIdx
     }
 
     /// Alignment score for a world-space point relative to a camera frame.

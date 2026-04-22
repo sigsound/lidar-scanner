@@ -56,7 +56,7 @@ struct HomeView: View {
                 .padding(.horizontal, 24)
                 .padding(.bottom, 48)
             }
-            .navigationDestination(isPresented: $showingScanSession) {
+.navigationDestination(isPresented: $showingScanSession) {
                 ScanSessionView()
             }
             .navigationDestination(isPresented: $showingLibrary) {

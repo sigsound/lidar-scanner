@@ -13,15 +13,43 @@ struct ResultViewerView: View {
     @State private var showingShareSheet = false
     @State private var savedToLibrary = false
     @State private var scnView: SCNView?
+    @State private var loadedScene: SCNScene?
+    @State private var sceneLoadFailed = false
 
     var body: some View {
         ZStack(alignment: .bottom) {
-            // 3D SceneKit viewer
-            SceneViewContainer(usdzURL: scan.usdzURL, scnViewRef: $scnView)
-                .ignoresSafeArea()
-
-            // Toolbar
-            toolbar
+            if let scene = loadedScene {
+                // 3D SceneKit viewer — shown once scene is loaded off the main thread.
+                SceneViewContainer(scene: scene, scnViewRef: $scnView)
+                    .ignoresSafeArea()
+                toolbar
+            } else if sceneLoadFailed {
+                ContentUnavailableView("Could not load mesh", systemImage: "exclamationmark.triangle")
+                    .frame(maxWidth: .infinity, maxHeight: .infinity)
+            } else {
+                VStack(spacing: 16) {
+                    ProgressView()
+                        .scaleEffect(1.4)
+                    Text("Loading mesh…")
+                        .font(.callout)
+                        .foregroundStyle(.secondary)
+                }
+                .frame(maxWidth: .infinity, maxHeight: .infinity)
+            }
+        }
+        .task {
+            // Load the USDZ on a background thread so we don't block the main thread
+            // and don't OOM by loading while the scan session's Metal buffers are
+            // still being released.
+            let url = scan.usdzURL
+            let scene = await Task.detached(priority: .userInitiated) {
+                try? SCNScene(url: url, options: nil)
+            }.value
+            if let scene {
+                loadedScene = scene
+            } else {
+                sceneLoadFailed = true
+            }
         }
         .navigationBarHidden(true)
         .confirmationDialog("Export Format", isPresented: $showingExportPicker, titleVisibility: .visible) {
@@ -105,7 +133,7 @@ struct ResultViewerView: View {
 // MARK: - SceneKit View Container
 
 private struct SceneViewContainer: UIViewRepresentable {
-    let usdzURL: URL
+    let scene: SCNScene
     @Binding var scnViewRef: SCNView?
 
     func makeUIView(context: Context) -> SCNView {
@@ -116,7 +144,8 @@ private struct SceneViewContainer: UIViewRepresentable {
         scnView.showsStatistics = false
         scnView.antialiasingMode = .multisampling4X
 
-        loadScene(into: scnView)
+        scnView.scene = scene
+        positionCamera(in: scnView, scene: scene)
 
         DispatchQueue.main.async {
             scnViewRef = scnView
@@ -127,36 +156,15 @@ private struct SceneViewContainer: UIViewRepresentable {
 
     func updateUIView(_ uiView: SCNView, context: Context) {}
 
-    private func loadScene(into scnView: SCNView) {
-        guard let scene = try? SCNScene(url: usdzURL, options: nil) else {
-            // Fallback: empty scene with a message node
-            let scene = SCNScene()
-            let text = SCNText(string: "Could not load mesh", extrusionDepth: 1)
-            text.firstMaterial?.diffuse.contents = UIColor.label
-            let textNode = SCNNode(geometry: text)
-            textNode.scale = SCNVector3(0.01, 0.01, 0.01)
-            scene.rootNode.addChildNode(textNode)
-            scnView.scene = scene
-            return
-        }
-
-        scnView.scene = scene
-
-        // Calculate bounding box to position camera
+    private func positionCamera(in scnView: SCNView, scene: SCNScene) {
         let (min, max) = scene.rootNode.boundingBox
         let center = SCNVector3(
             (min.x + max.x) / 2,
             (min.y + max.y) / 2,
             (min.z + max.z) / 2
         )
-        let extent = SCNVector3(
-            max.x - min.x,
-            max.y - min.y,
-            max.z - min.z
-        )
-        let maxDim = Swift.max(extent.x, extent.y, extent.z)
+        let maxDim = Swift.max(max.x - min.x, max.y - min.y, max.z - min.z)
 
-        // Isometric-ish overhead camera position
         let camera = SCNCamera()
         camera.fieldOfView = 55
         camera.zFar = 100

@@ -12,6 +12,7 @@ struct ScanSessionView: View {
     @State private var capturedKeyFrames: [CapturedKeyFrame] = []
     @State private var scanStartTime = Date()
     @State private var showCamera = true
+    @State private var arActive = true
 
     // Thermal monitoring
     @State private var thermalWarning = false
@@ -20,8 +21,24 @@ struct ScanSessionView: View {
     var body: some View {
         ZStack {
             // Full-screen AR view with point cloud
-            ARSCNViewContainer(sessionManager: sessionManager, showCamera: $showCamera)
+            ARSCNViewContainer(sessionManager: sessionManager, showCamera: $showCamera, isActive: $arActive)
                 .ignoresSafeArea()
+
+            // Loading overlay — shown until ARKit delivers its first tracked frame.
+            if case .notAvailable = sessionManager.trackingState {
+                ZStack {
+                    Color.black.ignoresSafeArea()
+                    VStack(spacing: 16) {
+                        ProgressView()
+                            .tint(.white)
+                            .scaleEffect(1.4)
+                        Text("Preparing scanner…")
+                            .font(.callout)
+                            .foregroundStyle(.white.opacity(0.8))
+                    }
+                }
+                .transition(.opacity)
+            }
 
             VStack(spacing: 0) {
                 topBar
@@ -69,6 +86,7 @@ struct ScanSessionView: View {
                     capturedAnchors = []
                     capturedKeyFrames = []
                     scanStartTime = Date()
+                    arActive = true
                     sessionManager.reset()
                 }
             )
@@ -180,6 +198,15 @@ struct ScanSessionView: View {
         capturedAnchors = sessionManager.session?.currentFrame?.anchors
             .compactMap { $0 as? ARMeshAnchor } ?? []
         capturedKeyFrames = sessionManager.capturedKeyFrames
+        // Free the session manager's ~660MB of key frame images immediately —
+        // ProcessingView now holds the only references via its own @State copies.
+        sessionManager.clearCapturedFrames()
+        arActive = false
         navigateToProcessing = true
+        // One async hop later ProcessingView has initialised its @State; clear ours.
+        Task { @MainActor in
+            capturedKeyFrames = []
+            capturedAnchors = []
+        }
     }
 }

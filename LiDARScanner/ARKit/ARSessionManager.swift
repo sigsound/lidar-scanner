@@ -47,6 +47,13 @@ class ARSessionManager: ObservableObject {
     // Software renderer avoids conflicts with ARKit's Metal pipeline.
     private static let conversionContext = CIContext(options: [.useSoftwareRenderer: true])
 
+    /// Releases key frame images after they have been transferred to ProcessingView.
+    func clearCapturedFrames() {
+        capturedKeyFrames = []
+        capturedFrameCount = 0
+        frameCaptureCounter = 0
+    }
+
     /// Clears all captured data and restarts the AR session for a fresh scan.
     func reset() {
         capturedKeyFrames = []

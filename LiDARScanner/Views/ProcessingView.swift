@@ -2,8 +2,10 @@ import SwiftUI
 import ARKit
 
 struct ProcessingView: View {
-    let meshAnchors: [ARMeshAnchor]
-    let keyFrames: [CapturedKeyFrame]
+    // Stored as @State so they can be explicitly cleared after baking,
+    // freeing ~660MB of key frame images before the result USDZ is loaded.
+    @State private var meshAnchors: [ARMeshAnchor]
+    @State private var keyFrames: [CapturedKeyFrame]
     let duration: TimeInterval
     var onRescan: (() -> Void)? = nil
 
@@ -12,6 +14,14 @@ struct ProcessingView: View {
     @State private var completedScan: Scan?
     @State private var processingError: String?
     @State private var navigateToResult = false
+
+    init(meshAnchors: [ARMeshAnchor], keyFrames: [CapturedKeyFrame],
+         duration: TimeInterval, onRescan: (() -> Void)? = nil) {
+        _meshAnchors = State(initialValue: meshAnchors)
+        _keyFrames   = State(initialValue: keyFrames)
+        self.duration = duration
+        self.onRescan = onRescan
+    }
 
     var body: some View {
         ZStack {
@@ -87,6 +97,10 @@ struct ProcessingView: View {
                 keyFrames: keyFrames,
                 duration: duration
             )
+            // Release the ~660MB of key frame images and mesh anchor data
+            // before the result screen loads the USDZ into memory.
+            keyFrames   = []
+            meshAnchors = []
             completedScan = scan
             navigateToResult = true
         } catch {

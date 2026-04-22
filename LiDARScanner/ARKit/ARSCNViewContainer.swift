@@ -6,6 +6,8 @@ import SceneKit
 struct ARSCNViewContainer: UIViewRepresentable {
     let sessionManager: ARSessionManager
     @Binding var showCamera: Bool
+    /// Set to false to pause the AR session and release all point cloud geometry before processing.
+    @Binding var isActive: Bool
 
     func makeUIView(context: Context) -> ARSCNView {
         let scnView = ARSCNView(frame: .zero)
@@ -40,6 +42,10 @@ struct ARSCNViewContainer: UIViewRepresentable {
 
     func updateUIView(_ uiView: ARSCNView, context: Context) {
         applyBackground(to: uiView, showCamera: showCamera)
+        if !isActive {
+            uiView.session.pause()
+            context.coordinator.pointCloudNode.releaseAll()
+        }
     }
 
     func makeCoordinator() -> Coordinator {

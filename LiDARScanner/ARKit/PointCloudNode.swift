@@ -13,13 +13,13 @@ import simd
 final class PointCloudNode: SCNNode {
 
     // MARK: - Configuration
-    private let voxelSize: Float  = 0.030    // 3 cm cells
-    private let maxVoxels         = 500_000  // stop accepting new points after this
-    private let depthStride       = 6        // sample every 6th depth pixel
+    private let voxelSize: Float  = 0.025    // 2.5 cm cells — finer detail
+    private let maxVoxels         = 5_000_000 // stop accepting new points after this
+    private let depthStride       = 4        // sample every 4th depth pixel — denser cloud
     private let chunkCap          = 10_000   // freeze a chunk when it reaches this size
     private let liveRebuildHz     = 0.10     // seconds between live-chunk geometry rebuilds
     private let minDepth: Float   = 0.20     // metres
-    private let maxDepth: Float   = 4.50
+    private let maxDepth: Float   = 8.00     // extended range for large spaces
 
     // MARK: - Accumulation
     /// Which voxels are already occupied — O(1) insert/lookup, 8 bytes per entry.
@@ -41,6 +41,18 @@ final class PointCloudNode: SCNNode {
         addChildNode(liveNode)
     }
     required init?(coder: NSCoder) { fatalError() }
+
+    // MARK: - Lifecycle
+
+    /// Removes all geometry and clears accumulators to free memory before processing.
+    func releaseAll() {
+        for node in frozenNodes { node.removeFromParentNode() }
+        frozenNodes.removeAll(keepingCapacity: false)
+        liveNode.geometry = nil
+        livePositions.removeAll(keepingCapacity: false)
+        liveColors.removeAll(keepingCapacity: false)
+        occupied.removeAll(keepingCapacity: false)
+    }
 
     // MARK: - Public update (render thread, every frame)
 

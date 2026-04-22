@@ -1,21 +1,17 @@
 import SwiftUI
 import ARKit
-import RoomPlan
 
 struct ScanSessionView: View {
     @EnvironmentObject var scanStore: ScanStore
     @Environment(\.dismiss) private var dismiss
 
     @StateObject private var sessionManager = ARSessionManager()
-    @StateObject private var roomCaptureManager = RoomCaptureManager()
     @State private var showingCancelAlert = false
     @State private var navigateToProcessing = false
     @State private var capturedAnchors: [ARMeshAnchor] = []
     @State private var capturedKeyFrames: [CapturedKeyFrame] = []
-    @State private var capturedRoom: CapturedRoom?
     @State private var scanStartTime = Date()
     @State private var showCamera = true
-    @State private var isStopping = false
 
     // Thermal monitoring
     @State private var thermalWarning = false
@@ -23,14 +19,9 @@ struct ScanSessionView: View {
 
     var body: some View {
         ZStack {
-            // Full-screen scan view: RoomCaptureView (camera + parametric overlay)
-            // with transparent SCNView on top for the colored point cloud.
-            RoomScanContainer(
-                sessionManager: sessionManager,
-                roomCaptureManager: roomCaptureManager,
-                showCamera: $showCamera
-            )
-            .ignoresSafeArea()
+            // Full-screen AR view with point cloud
+            ARSCNViewContainer(sessionManager: sessionManager, showCamera: $showCamera)
+                .ignoresSafeArea()
 
             VStack(spacing: 0) {
                 topBar
@@ -54,15 +45,6 @@ struct ScanSessionView: View {
         .onAppear {
             UIApplication.shared.isIdleTimerDisabled = true
             scanStartTime = Date()
-            // RoomScanContainer calls roomCaptureManager.start() once its view is ready.
-        }
-        .onChange(of: roomCaptureManager.detectedWalls) { _, walls in
-            sessionManager.updateCoverage(walls: walls,
-                                          objects: roomCaptureManager.detectedObjects)
-        }
-        .onChange(of: roomCaptureManager.detectedObjects) { _, objects in
-            sessionManager.updateCoverage(walls: roomCaptureManager.detectedWalls,
-                                          objects: objects)
         }
         .onDisappear {
             UIApplication.shared.isIdleTimerDisabled = false
@@ -81,16 +63,13 @@ struct ScanSessionView: View {
             ProcessingView(
                 meshAnchors: capturedAnchors,
                 keyFrames: capturedKeyFrames,
-                capturedRoom: capturedRoom,
                 duration: Date().timeIntervalSince(scanStartTime),
                 onRescan: {
                     navigateToProcessing = false
-                    capturedAnchors   = []
+                    capturedAnchors = []
                     capturedKeyFrames = []
-                    capturedRoom      = nil
-                    scanStartTime     = Date()
-                    sessionManager.clearCaptureState()
-                    roomCaptureManager.restart()
+                    scanStartTime = Date()
+                    sessionManager.reset()
                 }
             )
         }
@@ -140,19 +119,13 @@ struct ScanSessionView: View {
                 .padding(.horizontal)
 
             Button(action: stopScan) {
-                if isStopping {
-                    Label("Finalising...", systemImage: "hourglass")
-                        .frame(maxWidth: .infinity)
-                } else {
-                    Label("Stop & Process", systemImage: "stop.circle.fill")
-                        .frame(maxWidth: .infinity)
-                }
+                Label("Stop & Process", systemImage: "stop.circle.fill")
+                    .frame(maxWidth: .infinity)
             }
             .buttonStyle(.borderedProminent)
             .tint(.red)
             .controlSize(.large)
             .padding(.horizontal)
-            .disabled(isStopping)
         }
         .padding(.vertical, 16)
         .background(.ultraThinMaterial)
@@ -161,21 +134,10 @@ struct ScanSessionView: View {
     private var coverageBar: some View {
         VStack(spacing: 6) {
             HStack {
-                Text("Coverage")
+                Text("Mesh Coverage")
                     .font(.caption)
                     .foregroundStyle(.secondary)
                 Spacer()
-                if roomCaptureManager.detectedWalls > 0 || roomCaptureManager.detectedObjects > 0 {
-                    Image(systemName: "square.3.layers.3d")
-                        .font(.caption)
-                        .foregroundStyle(.cyan)
-                    Text("\(roomCaptureManager.detectedWalls)W \(roomCaptureManager.detectedObjects)Obj")
-                        .font(.caption.monospacedDigit())
-                        .foregroundStyle(.cyan)
-                    Text("·")
-                        .font(.caption)
-                        .foregroundStyle(.secondary)
-                }
                 Text("\(sessionManager.capturedFrameCount) frames")
                     .font(.caption.monospacedDigit())
                     .foregroundStyle(sessionManager.capturedFrameCount > 0 ? .green : .secondary)
@@ -215,18 +177,9 @@ struct ScanSessionView: View {
     // MARK: - Actions
 
     private func stopScan() {
-        guard !isStopping else { return }
-        isStopping = true
-        // Snapshot anchors now, while the session is still live.
-        // After stop() the session ends and currentFrame anchors may be cleared.
-        let anchorsSnapshot = sessionManager.latestMeshAnchors
-        Task {
-            let room = await roomCaptureManager.stop()
-            capturedAnchors   = anchorsSnapshot
-            capturedKeyFrames = sessionManager.capturedKeyFrames
-            capturedRoom      = room
-            navigateToProcessing = true
-            isStopping = false
-        }
+        capturedAnchors = sessionManager.session?.currentFrame?.anchors
+            .compactMap { $0 as? ARMeshAnchor } ?? []
+        capturedKeyFrames = sessionManager.capturedKeyFrames
+        navigateToProcessing = true
     }
 }

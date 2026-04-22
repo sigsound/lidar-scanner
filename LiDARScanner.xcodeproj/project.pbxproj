@@ -7,7 +7,6 @@
 	objects = {
 
 /* Begin PBXBuildFile section */
-		0CABCA8F38B8410E036C1E3E /* RoomMeshBuilder.swift in Sources */ = {isa = PBXBuildFile; fileRef = FDF621B18F9587F8F2723C07 /* RoomMeshBuilder.swift */; };
 		18495CC9526AF9DE34309DEC /* PointCloudNode.swift in Sources */ = {isa = PBXBuildFile; fileRef = 44E348CD814184CD5DF07DC5 /* PointCloudNode.swift */; };
 		1B93EF19621E818538361624 /* ARSCNViewContainer.swift in Sources */ = {isa = PBXBuildFile; fileRef = 0A3C658CEACA64915361A096 /* ARSCNViewContainer.swift */; };
 		277DFAE6D37BD8351E5CA719 /* MeshProcessor.swift in Sources */ = {isa = PBXBuildFile; fileRef = 6A24F731993DEED37D9070D6 /* MeshProcessor.swift */; };
@@ -16,19 +15,16 @@
 		3EFFB7A025FC9D3D3DEB7009 /* TextureBaker.swift in Sources */ = {isa = PBXBuildFile; fileRef = 4A9612EE8BF7CA2D652AB75D /* TextureBaker.swift */; };
 		44036F394A133D15DE4A71F8 /* ARSessionManager.swift in Sources */ = {isa = PBXBuildFile; fileRef = B059CD400868036EA10980FC /* ARSessionManager.swift */; };
 		4C24A6DF07BA3DC6758FBE4D /* ScanSessionView.swift in Sources */ = {isa = PBXBuildFile; fileRef = FBE0805889CFA0A04341E804 /* ScanSessionView.swift */; };
-		5436CE1EA1E507FF532D9B9D /* RoomCaptureManager.swift in Sources */ = {isa = PBXBuildFile; fileRef = 860394BDC9058F8E338CDAA9 /* RoomCaptureManager.swift */; };
 		54701E4CB715E3E0E35B2594 /* Assets.xcassets in Resources */ = {isa = PBXBuildFile; fileRef = F5370A2B57ACAC79B4C2CE92 /* Assets.xcassets */; };
 		7335F030F73C5A0B0F84D6B9 /* ARViewContainer.swift in Sources */ = {isa = PBXBuildFile; fileRef = 5032895BBBA832B1118C990F /* ARViewContainer.swift */; };
 		946414728DD49948D62022E4 /* MeshAggregator.swift in Sources */ = {isa = PBXBuildFile; fileRef = 6BDFD1417F5C8B5711C80702 /* MeshAggregator.swift */; };
 		A0F12722E99A92511603FC8A /* Scan.swift in Sources */ = {isa = PBXBuildFile; fileRef = F0A2756C7473C320B4AFFCED /* Scan.swift */; };
 		A4BA2A2EEE5FDDF293FA9121 /* LiDARScannerApp.swift in Sources */ = {isa = PBXBuildFile; fileRef = 666A42F89FC5DE0761F730F5 /* LiDARScannerApp.swift */; };
 		A5BAEB8AE76E6C62153ADE27 /* ScanStore.swift in Sources */ = {isa = PBXBuildFile; fileRef = 39765B80731DA35E5038842B /* ScanStore.swift */; };
-		A7F72EFB30462E09B45B5115 /* RoomScanContainer.swift in Sources */ = {isa = PBXBuildFile; fileRef = E6FABB1F2BD6922B533B7B9E /* RoomScanContainer.swift */; };
 		D176CB5F74170EFBEBC8C79E /* ProcessingView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 622C757F5A587C209176C420 /* ProcessingView.swift */; };
 		D7DCE94A94DF0A326797E8D8 /* ScanMetadata.swift in Sources */ = {isa = PBXBuildFile; fileRef = D34F177E40F7A5EA2A757CB7 /* ScanMetadata.swift */; };
 		E2F611BE94910253C054B5B9 /* ResultViewerView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 930F75786366178BB7328F95 /* ResultViewerView.swift */; };
 		E4A378A1E3E4A027701D6F49 /* ZIPFoundation in Frameworks */ = {isa = PBXBuildFile; productRef = 4AFD9E74E5C28FC7A592A383 /* ZIPFoundation */; };
-		E9821B8B99E566FF071EBFC8 /* RoomPlan.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = 8FB2508A153AE66B70573E3F /* RoomPlan.framework */; };
 		EDBFB6A26C9CBB518CAFA122 /* HomeView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 2CE8E5E2B4C343677129D6D5 /* HomeView.swift */; };
 /* End PBXBuildFile section */
 
@@ -37,7 +33,7 @@
 		1F85DDAB5B0DA6378FA7536B /* Exporter.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Exporter.swift; sourceTree = "<group>"; };
 		2CE8E5E2B4C343677129D6D5 /* HomeView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = HomeView.swift; sourceTree = "<group>"; };
 		39765B80731DA35E5038842B /* ScanStore.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ScanStore.swift; sourceTree = "<group>"; };
-		42139EA85008E4704A59116C /* LiDARScanner.app */ = {isa = PBXFileReference; includeInIndex = 0; lastKnownFileType = wrapper.application; path = LiDARScanner.app; sourceTree = BUILT_PRODUCTS_DIR; };
+		42139EA85008E4704A59116C /* LiDARScanner.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = LiDARScanner.app; sourceTree = BUILT_PRODUCTS_DIR; };
 		44E348CD814184CD5DF07DC5 /* PointCloudNode.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PointCloudNode.swift; sourceTree = "<group>"; };
 		4A9612EE8BF7CA2D652AB75D /* TextureBaker.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TextureBaker.swift; sourceTree = "<group>"; };
 		5032895BBBA832B1118C990F /* ARViewContainer.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ARViewContainer.swift; sourceTree = "<group>"; };
@@ -45,18 +41,14 @@
 		666A42F89FC5DE0761F730F5 /* LiDARScannerApp.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = LiDARScannerApp.swift; sourceTree = "<group>"; };
 		6A24F731993DEED37D9070D6 /* MeshProcessor.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MeshProcessor.swift; sourceTree = "<group>"; };
 		6BDFD1417F5C8B5711C80702 /* MeshAggregator.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MeshAggregator.swift; sourceTree = "<group>"; };
-		860394BDC9058F8E338CDAA9 /* RoomCaptureManager.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = RoomCaptureManager.swift; sourceTree = "<group>"; };
-		8FB2508A153AE66B70573E3F /* RoomPlan.framework */ = {isa = PBXFileReference; lastKnownFileType = wrapper.framework; name = RoomPlan.framework; path = System/Library/Frameworks/RoomPlan.framework; sourceTree = SDKROOT; };
 		930F75786366178BB7328F95 /* ResultViewerView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ResultViewerView.swift; sourceTree = "<group>"; };
 		B059CD400868036EA10980FC /* ARSessionManager.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ARSessionManager.swift; sourceTree = "<group>"; };
 		BD88BE26E4CAF5629042A93B /* Info.plist */ = {isa = PBXFileReference; lastKnownFileType = text.plist; path = Info.plist; sourceTree = "<group>"; };
 		BF5D392C4C73F9B882C83E76 /* ScanLibraryView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ScanLibraryView.swift; sourceTree = "<group>"; };
 		D34F177E40F7A5EA2A757CB7 /* ScanMetadata.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ScanMetadata.swift; sourceTree = "<group>"; };
-		E6FABB1F2BD6922B533B7B9E /* RoomScanContainer.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = RoomScanContainer.swift; sourceTree = "<group>"; };
 		F0A2756C7473C320B4AFFCED /* Scan.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Scan.swift; sourceTree = "<group>"; };
 		F5370A2B57ACAC79B4C2CE92 /* Assets.xcassets */ = {isa = PBXFileReference; lastKnownFileType = folder.assetcatalog; path = Assets.xcassets; sourceTree = "<group>"; };
 		FBE0805889CFA0A04341E804 /* ScanSessionView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ScanSessionView.swift; sourceTree = "<group>"; };
-		FDF621B18F9587F8F2723C07 /* RoomMeshBuilder.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = RoomMeshBuilder.swift; sourceTree = "<group>"; };
 /* End PBXFileReference section */
 
 /* Begin PBXFrameworksBuildPhase section */
@@ -65,7 +57,6 @@
 			buildActionMask = 2147483647;
 			files = (
 				E4A378A1E3E4A027701D6F49 /* ZIPFoundation in Frameworks */,
-				E9821B8B99E566FF071EBFC8 /* RoomPlan.framework in Frameworks */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -79,8 +70,6 @@
 				B059CD400868036EA10980FC /* ARSessionManager.swift */,
 				5032895BBBA832B1118C990F /* ARViewContainer.swift */,
 				44E348CD814184CD5DF07DC5 /* PointCloudNode.swift */,
-				860394BDC9058F8E338CDAA9 /* RoomCaptureManager.swift */,
-				E6FABB1F2BD6922B533B7B9E /* RoomScanContainer.swift */,
 			);
 			path = ARKit;
 			sourceTree = "<group>";
@@ -98,14 +87,6 @@
 				DA5551ED7FFE575FB316B809 /* Views */,
 			);
 			path = LiDARScanner;
-			sourceTree = "<group>";
-		};
-		27D41ED3CE33B2917DC9F440 /* Frameworks */ = {
-			isa = PBXGroup;
-			children = (
-				8FB2508A153AE66B70573E3F /* RoomPlan.framework */,
-			);
-			name = Frameworks;
 			sourceTree = "<group>";
 		};
 		3352A34B8E978CEB907851B0 /* App */ = {
@@ -157,7 +138,6 @@
 			isa = PBXGroup;
 			children = (
 				0ED440648C21F4EEA15C68BD /* LiDARScanner */,
-				27D41ED3CE33B2917DC9F440 /* Frameworks */,
 				835BBDDF9B7B57E56E686EED /* Products */,
 			);
 			sourceTree = "<group>";
@@ -168,7 +148,6 @@
 				1F85DDAB5B0DA6378FA7536B /* Exporter.swift */,
 				6BDFD1417F5C8B5711C80702 /* MeshAggregator.swift */,
 				6A24F731993DEED37D9070D6 /* MeshProcessor.swift */,
-				FDF621B18F9587F8F2723C07 /* RoomMeshBuilder.swift */,
 				4A9612EE8BF7CA2D652AB75D /* TextureBaker.swift */,
 			);
 			path = Processing;
@@ -205,8 +184,6 @@
 			attributes = {
 				BuildIndependentTargetsInParallel = YES;
 				LastUpgradeCheck = 1500;
-				TargetAttributes = {
-				};
 			};
 			buildConfigurationList = B091FFA70E0871E120336AE2 /* Build configuration list for PBXProject "LiDARScanner" */;
 			developmentRegion = en;
@@ -257,9 +234,6 @@
 				18495CC9526AF9DE34309DEC /* PointCloudNode.swift in Sources */,
 				D176CB5F74170EFBEBC8C79E /* ProcessingView.swift in Sources */,
 				E2F611BE94910253C054B5B9 /* ResultViewerView.swift in Sources */,
-				5436CE1EA1E507FF532D9B9D /* RoomCaptureManager.swift in Sources */,
-				0CABCA8F38B8410E036C1E3E /* RoomMeshBuilder.swift in Sources */,
-				A7F72EFB30462E09B45B5115 /* RoomScanContainer.swift in Sources */,
 				A0F12722E99A92511603FC8A /* Scan.swift in Sources */,
 				2AA4F736A477F243DB2C8982 /* ScanLibraryView.swift in Sources */,
 				D7DCE94A94DF0A326797E8D8 /* ScanMetadata.swift in Sources */,
@@ -340,6 +314,7 @@
 			buildSettings = {
 				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
 				CODE_SIGN_IDENTITY = "iPhone Developer";
+				DEVELOPMENT_TEAM = 8PZ8LLTEJD;
 				ENABLE_BITCODE = NO;
 				INFOPLIST_FILE = LiDARScanner/Info.plist;
 				IPHONEOS_DEPLOYMENT_TARGET = 17.0;
@@ -359,6 +334,7 @@
 			buildSettings = {
 				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
 				CODE_SIGN_IDENTITY = "iPhone Developer";
+				DEVELOPMENT_TEAM = 8PZ8LLTEJD;
 				ENABLE_BITCODE = NO;
 				INFOPLIST_FILE = LiDARScanner/Info.plist;
 				IPHONEOS_DEPLOYMENT_TARGET = 17.0;

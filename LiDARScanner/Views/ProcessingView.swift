@@ -1,11 +1,9 @@
 import SwiftUI
 import ARKit
-import RoomPlan
 
 struct ProcessingView: View {
     let meshAnchors: [ARMeshAnchor]
     let keyFrames: [CapturedKeyFrame]
-    var capturedRoom: CapturedRoom? = nil
     let duration: TimeInterval
     var onRescan: (() -> Void)? = nil
 
@@ -87,7 +85,6 @@ struct ProcessingView: View {
             let scan = try await processor.process(
                 meshAnchors: meshAnchors,
                 keyFrames: keyFrames,
-                capturedRoom: capturedRoom,
                 duration: duration
             )
             completedScan = scan

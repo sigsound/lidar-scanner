@@ -7,9 +7,6 @@ import SceneKit
 struct ARSCNViewContainer: UIViewRepresentable {
     let sessionManager: ARSessionManager
     @Binding var showCamera: Bool
-    /// When provided (RoomPlan mode), this session is already running — we attach to it
-    /// rather than starting our own. RoomPlan owns the session; we must not call run() on it.
-    var externalARSession: ARSession? = nil
 
     func makeUIView(context: Context) -> ARSCNView {
         let scnView = ARSCNView(frame: .zero)
@@ -21,30 +18,23 @@ struct ARSCNViewContainer: UIViewRepresentable {
         // Add the point cloud node at world origin
         scnView.scene.rootNode.addChildNode(context.coordinator.pointCloudNode)
 
-        if let external = externalARSession {
-            // RoomPlan mode: attach to the already-running session.
-            // Don't call run() — RoomPlan manages the session lifecycle.
-            scnView.session = external
-            Task { @MainActor in
-                sessionManager.attachSession(external)
-            }
-        } else {
-            // Standalone mode: start our own session.
-            let config = ARWorldTrackingConfiguration()
-            config.sceneReconstruction = .meshWithClassification
-            config.environmentTexturing = .automatic
-            if ARWorldTrackingConfiguration.supportsFrameSemantics(.sceneDepth) {
-                config.frameSemantics = [.sceneDepth, .smoothedSceneDepth]
-            }
-            scnView.session.run(config, options: [.resetTracking, .removeExistingAnchors])
-            let session = scnView.session
-            Task { @MainActor in
-                sessionManager.setSession(session)
-            }
+        // Start AR session
+        let config = ARWorldTrackingConfiguration()
+        config.sceneReconstruction = .meshWithClassification
+        config.environmentTexturing = .automatic
+        if ARWorldTrackingConfiguration.supportsFrameSemantics(.sceneDepth) {
+            config.frameSemantics = [.sceneDepth, .smoothedSceneDepth]
         }
+        scnView.session.run(config, options: [.resetTracking, .removeExistingAnchors])
 
         // Register delegate (Coordinator) for render callbacks
         scnView.delegate = context.coordinator
+
+        // Hand session to ARSessionManager
+        let session = scnView.session
+        Task { @MainActor in
+            sessionManager.setSession(session)
+        }
 
         // Apply initial camera background
         applyBackground(to: scnView, showCamera: showCamera)
@@ -91,19 +81,19 @@ struct ARSCNViewContainer: UIViewRepresentable {
             frameCounter += 1
             guard frameCounter % rebuildStride == 0 else { return }
 
-            guard let scnView = renderer as? ARSCNView,
-                  let arFrame = scnView.session.currentFrame else { return }
+            guard let scnView  = renderer as? ARSCNView,
+                  let arFrame  = scnView.session.currentFrame else { return }
 
-            // Always forward to ARSessionManager — drives guidance, warnings, and key-frame
-            // capture regardless of whether mesh anchors have appeared yet.
+            let anchors = arFrame.anchors.compactMap { $0 as? ARMeshAnchor }
+            guard !anchors.isEmpty else { return }
+
+            pointCloudNode.update(anchors: anchors, frame: arFrame)
+
+            // Forward the frame to ARSessionManager (key-frame capture, coverage, etc.)
+            // Must hop to MainActor since ARSessionManager is @MainActor.
             Task { @MainActor [weak sessionManager] in
                 sessionManager?.didUpdate(frame: arFrame)
             }
-
-            // Point cloud only makes sense once mesh anchors exist.
-            let anchors = arFrame.anchors.compactMap { $0 as? ARMeshAnchor }
-            guard !anchors.isEmpty else { return }
-            pointCloudNode.update(anchors: anchors, frame: arFrame)
         }
     }
 }

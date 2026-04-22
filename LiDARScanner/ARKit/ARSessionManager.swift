@@ -34,8 +34,6 @@ class ARSessionManager: ObservableObject {
 
     private(set) var session: ARSession?
     private(set) var capturedKeyFrames: [CapturedKeyFrame] = []
-    /// Most recent set of ARMeshAnchors seen in any frame — snapshotted while session is live.
-    private(set) var latestMeshAnchors: [ARMeshAnchor] = []
 
     // Strong reference to the delegate adapter — ARSession.delegate is weak,
     // so without this the adapter is immediately deallocated after setSession().
@@ -49,11 +47,15 @@ class ARSessionManager: ObservableObject {
     // Software renderer avoids conflicts with ARKit's Metal pipeline.
     private static let conversionContext = CIContext(options: [.useSoftwareRenderer: true])
 
-    /// Clears captured data and restarts the AR session.
-    /// Only restarts if this manager owns the session (standalone ARKit mode).
+    /// Clears all captured data and restarts the AR session for a fresh scan.
     func reset() {
-        clearCaptureState()
-        guard delegateAdapter != nil else { return }   // externally-owned session — don't restart
+        capturedKeyFrames = []
+        capturedFrameCount = 0
+        meshCoverage = 0
+        frameCaptureCounter = 0
+        guidance = .initial
+        activeWarning = nil
+
         let config = ARWorldTrackingConfiguration()
         config.sceneReconstruction = .meshWithClassification
         config.environmentTexturing = .automatic
@@ -61,25 +63,6 @@ class ARSessionManager: ObservableObject {
             config.frameSemantics = [.sceneDepth, .smoothedSceneDepth]
         }
         session?.run(config, options: [.resetTracking, .removeExistingAnchors])
-    }
-
-    /// Clears all captured data without touching the session — used when the session
-    /// is externally owned (e.g. by RoomCaptureSession).
-    func clearCaptureState() {
-        capturedKeyFrames  = []
-        capturedFrameCount = 0
-        meshCoverage       = 0
-        frameCaptureCounter = 0
-        guidance           = .initial
-        activeWarning      = nil
-        latestMeshAnchors  = []
-    }
-
-    /// Attaches an externally-owned ARSession (e.g. from RoomCaptureSession) without
-    /// overriding its delegate. Key-frame capture is driven by the ARSCNView render loop.
-    func attachSession(_ session: ARSession) {
-        self.session = session
-        // delegateAdapter intentionally left nil — we do not own this session
     }
 
     func setSession(_ session: ARSession) {
@@ -97,12 +80,6 @@ class ARSessionManager: ObservableObject {
         captureKeyFrameIfNeeded(frame: frame)
         updateMeshCoverage(frame: frame)
         updateGuidance()
-        // Keep a running snapshot of mesh anchors so stopScan() can read them
-        // before the session stops (currentFrame anchors may clear on session end).
-        let anchors = frame.anchors.compactMap { $0 as? ARMeshAnchor }
-        if !anchors.isEmpty {
-            latestMeshAnchors = anchors
-        }
     }
 
     // MARK: - Private helpers
@@ -172,21 +149,7 @@ class ARSessionManager: ObservableObject {
 
     private func updateMeshCoverage(frame: ARFrame) {
         let count = frame.anchors.filter { $0 is ARMeshAnchor }.count
-        // In RoomPlan mode, mesh anchor count may stay low; the caller can
-        // override this via updateCoverage(roomElements:) below.
-        if count > 0 {
-            meshCoverage = min(Float(count) / 30.0, 1.0)
-        }
-    }
-
-    /// Called by ScanSessionView to blend RoomPlan detection counts into coverage
-    /// when raw ARMeshAnchors are sparse (RoomPlan session mode).
-    func updateCoverage(walls: Int, objects: Int) {
-        // Treat 8+ surfaces as "sufficient" coverage (walls + objects combined)
-        let total = walls + objects
-        let roomCoverage = min(Float(total) / 8.0, 1.0)
-        meshCoverage = max(meshCoverage, roomCoverage)
-        updateGuidance()
+        meshCoverage = min(Float(count) / 30.0, 1.0)
     }
 
     private func updateGuidance() {

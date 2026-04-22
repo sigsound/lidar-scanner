@@ -27,9 +27,6 @@ struct ResultViewerView: View {
         .confirmationDialog("Export Format", isPresented: $showingExportPicker, titleVisibility: .visible) {
             Button("Share as USDZ") { prepareExport(format: .usdz) }
             Button("Share as OBJ (ZIP)") { prepareExport(format: .objZip) }
-            if scan.hasRoomPlanModel {
-                Button("Share RoomPlan Model") { prepareExport(format: .roomPlan) }
-            }
             Button("Cancel", role: .cancel) {}
         }
         .sheet(isPresented: $showingShareSheet) {
@@ -87,7 +84,7 @@ struct ResultViewerView: View {
         .foregroundStyle(.primary)
     }
 
-    private enum ExportFormat { case usdz, objZip, roomPlan }
+    private enum ExportFormat { case usdz, objZip }
 
     private func prepareExport(format: ExportFormat) {
         switch format {
@@ -95,8 +92,6 @@ struct ResultViewerView: View {
             exportItem = scan.usdzURL
         case .objZip:
             exportItem = scan.objZipURL
-        case .roomPlan:
-            exportItem = scan.roomPlanURL
         }
         showingShareSheet = true
     }
